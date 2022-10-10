@@ -1,0 +1,13 @@
+{
+    "name": "trilliant-tedious",
+    "version": "0.0.1",
+    "main": "index.js",
+    "dependencies": {
+		"tedious": "^6.1.1",
+        "trilliant": "git+https://github.com/unidyne/trilliant.git"
+	},
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/unidyne/trilliant-tedious.git"
+    }
+}
