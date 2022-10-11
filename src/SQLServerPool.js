@@ -59,7 +59,7 @@ module.exports = class SQLServerPool {
 			};
 			
 			// when connection made, return to caller
-			con.on('connect', (err) => {
+			worker.con.on('connect', (err) => {
 				if(err) return handleError(err);
 				worker.status = STATUS.IDLE;
 				return resolve(worker);
@@ -67,7 +67,7 @@ module.exports = class SQLServerPool {
 
 			// if connection errors out, mark failed and resolve null
 			// not sure if this can lead to multiple-resolve issue...
-			con.on('error', (err) => {
+			worker.con.on('error', (err) => {
 				//console.log('aquireConnection()');
 				handleError(err);
 				worker.status = STATUS.FAIL;
@@ -75,7 +75,7 @@ module.exports = class SQLServerPool {
 			});
 			
 			// if connection ends, remove from pool
-			con.on('end', () => {
+			worker.con.on('end', () => {
 				for(var i = this.#pool.length - 1; i >= 0; i--) {
 					if(this.#pool[i] === worker)
 						return this.#pool.splice(i,1);
