@@ -3,7 +3,8 @@
 ================================*/
 
 const fs = require('fs'),
-	path = require('path');
+	path = require('path'),
+	{Request} = require('tedious');
 
 const { handleError } = require('./utils');
 const { STATUS, LAMBDA, TYPES } = require('./constants');
@@ -136,7 +137,7 @@ function getPromiseHandler(job, queue) {
 		}
 
 		job.worker.status = STATUS.IDLE;
-		if(rowCount == 0) job.callback([]);
+		if(rowCount == 0) return job.callback([]);
 		if(!job.queryDef.flatten) return job.callback(rows);
 		return job.callback(flattenResults(rows));
 	}
