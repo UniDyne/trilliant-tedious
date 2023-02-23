@@ -28,4 +28,8 @@ module.exports = class SQLService extends ServiceWrapper {
         
         plug.Queries = this.SQLPool.loadQueries(q, plug.homeDir);
     }
+
+    loadQueries(q, homeDir) {
+        return this.SQLPool.loadQueries(q, homeDir);
+    }
 };
