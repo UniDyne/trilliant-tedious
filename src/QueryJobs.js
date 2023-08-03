@@ -4,10 +4,16 @@
 
 const fs = require('fs'),
 	path = require('path'),
+	crypto = require('crypto'),
 	{Request} = require('tedious');
+
+const { DiskCache } = require('trilliant');
 
 const { handleError } = require('./utils');
 const { STATUS, LAMBDA, TYPES } = require('./constants');
+
+
+const ResultCache = new DiskCache(16, path.join(process.cwd(), 'cache'), 60 * 60 * 1000);
 
 
 /**
@@ -46,12 +52,17 @@ function flattenResults(rows) {
  * @returns 
  */
 function createJob(queryDef, params, callback) {
-	return {
+	let job = {
 		queryDef: queryDef,
 		params: params || {},
 		callback: callback || queryDef.callback,
 		worker: null
 	};
+
+	if(queryDef.cache)
+		job.cacheKey = getCacheKey(queryDef.uuid, params);
+
+	return job;
 }
 
 /**
@@ -77,9 +88,14 @@ function execJob(job) {
  * @returns 
  */
 function createCallbackQuery(queryDef, queue) {
-	return (obj, optcallback) => {
+	return async (obj, optcallback) => {
 		const job = createJob(queryDef, obj, optcallback);
 		
+		if(job.cacheKey) {
+			let res = await ResultCache.get(job.cacheKey);
+			if(res != null) return job.callback(null, res.rowCount, res.rows);
+		}
+
 		job.resultHandler = getCallbackHandler(job);
 		queue.push(job);
 	};
@@ -94,6 +110,8 @@ function createCallbackQuery(queryDef, queue) {
 function getCallbackHandler(job) {
 	if(!job.callback) job.callback = LAMBDA;
 	return (err, rowCount, rows) => {
+		if(job.cacheKey)
+			ResultCache.set(job.cacheKey, {rowCount: rowCount, rows: rows}, job.queryDef.cache.expiry);
 		job.worker.status = STATUS.IDLE;
 		return job.callback(err, rowCount, rows);
 	}
@@ -108,8 +126,18 @@ function getCallbackHandler(job) {
  */
 function createPromiseQuery(queryDef, queue) {
 	return obj => {
-		return new Promise((resolve, reject) => {
+		return new Promise(async (resolve, reject) => {
 			const job = createJob(queryDef, obj, resolve);
+
+			if(job.cacheKey) {
+				let res = await ResultCache.get(job.cacheKey);
+				if(res != null) {
+					if(res.rowCount == 0) return job.callback([]);
+					if(!job.queryDef.flatten) return job.callback(res.rows);
+					return job.callback(flattenResults(res.rows));
+				}
+			}
+
 			job.reject = reject;
 			job.resultHandler = getPromiseHandler(job, queue);
 			queue.push(job);
@@ -136,11 +164,39 @@ function getPromiseHandler(job, queue) {
 			} else return job.reject();
 		}
 
+		if(job.cacheKey)
+			ResultCache.set(job.cacheKey, {rowCount: rowCount, rows: rows}, job.queryDef.cache.expiry);
+
 		job.worker.status = STATUS.IDLE;
 		if(rowCount == 0) return job.callback([]);
 		if(!job.queryDef.flatten) return job.callback(rows);
 		return job.callback(flattenResults(rows));
 	}
+}
+
+
+// utility method used to consistently produce the same JSON structures
+function getCanonicalJSON(obj) {
+	if(typeof obj === 'object') {
+		var keys = [];
+		// get keys and sort them
+		for(var k in obj) keys.push(k);
+		keys.sort();
+		
+		// append each kvp to string
+		return '{' + keys.reduce(function(prev, cur, i) {
+			return prev + (i>0?',':'') + '"' + cur + '":' + getCanonicalJSON(obj[cur]);
+		}, '') + '}';
+	} else if(typeof obj === 'function') {
+		return 'null';
+	} else return JSON.stringify(obj);
+}
+
+function getCacheKey(uuid, obj) {
+	let hash = crypto.createHash('sha256');
+	let cargs = getCanonicalJSON(obj);
+	hash.update([uuid, cargs].join('::'));
+	return hash.digest('hex');
 }
 
 
@@ -159,14 +215,23 @@ function loadQueries(queryList, baseDir, queue) {
     if(!baseDir) baseDir = path.join(__dirname, '..', '..');
     
     for(var i = 0; i < queryList.length; i++) {
+		// assign unique ID for caching
+		queryList[i].uuid = crypto.randomUUID();
+
         // if sql starts with colon, load the query from a file
         if(queryList[i].sql.substr(0,1) == ':')
             queryList[i].sql = fs.readFileSync(path.join(baseDir, queryList[i].sql.substr(1)), 'utf8');
         
         if(!queryList[i].params) queryList[i].params = [];
         
+		
         if(queryList[i].usePromise) queryHash[queryList[i].id] = createPromiseQuery(queryList[i], queue);
         else queryHash[queryList[i].id] = createCallbackQuery(queryList[i], queue);
+
+		if(queryList[i].cache) {
+			let cacheParams = Object.assign({expiry:60*60*1000}, queryList[i].cache);
+			queryHash[queryList[i].id] = createCacheWrapper(queryHash[queryList[i].id], queryList[i].usePromise, cacheParams);
+		}
     }
     
     return queryHash;
