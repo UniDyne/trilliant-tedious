@@ -227,11 +227,6 @@ function loadQueries(queryList, baseDir, queue) {
 		
         if(queryList[i].usePromise) queryHash[queryList[i].id] = createPromiseQuery(queryList[i], queue);
         else queryHash[queryList[i].id] = createCallbackQuery(queryList[i], queue);
-
-		if(queryList[i].cache) {
-			let cacheParams = Object.assign({expiry:60*60*1000}, queryList[i].cache);
-			queryHash[queryList[i].id] = createCacheWrapper(queryHash[queryList[i].id], queryList[i].usePromise, cacheParams);
-		}
     }
     
     return queryHash;
