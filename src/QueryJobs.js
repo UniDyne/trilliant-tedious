@@ -13,7 +13,7 @@ const { handleError } = require('./utils');
 const { STATUS, LAMBDA, TYPES } = require('./constants');
 
 
-const ResultCache = new DiskCache(16, path.join(process.cwd(), 'cache'), 60 * 60 * 1000);
+const ResultCache = new DiskCache(16, 60 * 60 * 1000, path.join(process.cwd(), 'cache'));
 
 
 /**
