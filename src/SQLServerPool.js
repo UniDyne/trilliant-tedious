@@ -5,7 +5,7 @@ const fs = require('fs'),
 
 const {handleError, decode64} = require('./utils');
 const {STATUS, MAX_POOL, DEFAULT_CONFIG} = require('./constants');
-const {execJob, loadQueries} = require('./QueryJobs');
+const {execJob, loadQueries, createCallbackQuery} = require('./QueryJobs');
 
 
 
@@ -149,7 +149,9 @@ module.exports = class SQLServerPool {
 	 * @param {*} sql 
 	 * @param {*} callback 
 	 */
-	async exec(sql, callback) {
+	exec(sql, callback) {
+		createCallbackQuery({sql:sql, params:[]}, this.#requestQueue)(null, callback);
+		/*
 		this.#requestQueue.push((pooled) => {
 			pooled.status = STATUS.BUSY;
 			pooled.con.execSql(new Request(sql, (err, count, rows) => {
@@ -157,6 +159,7 @@ module.exports = class SQLServerPool {
 				if(callback) return callback(err, count, rows);
 			}));
 		});
+		*/
 	}
 	
 	/**

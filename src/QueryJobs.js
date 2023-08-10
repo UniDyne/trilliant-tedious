@@ -237,6 +237,9 @@ module.exports = {
     loadQueries: loadQueries,
 
     createJob: createJob,
-    execJob: execJob
+    execJob: execJob,
+
+	createCallbackQuery: createCallbackQuery,
+	createPromiseQuery: createPromiseQuery
 };
 
