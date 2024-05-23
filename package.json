@@ -1,9 +1,9 @@
 {
     "name": "trilliant-tedious",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "main": "index.js",
     "dependencies": {
-		"tedious": "^6.1.1",
+		"tedious": "^18.2.0",
         "trilliant": "git+https://github.com/unidyne/trilliant.git"
 	},
     "repository": {
