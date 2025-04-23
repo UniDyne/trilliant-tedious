@@ -81,6 +81,8 @@ module.exports = class SQLServerPool {
 						return this.#pool.splice(i,1);
 				}
 			});
+
+			worker.con.connect();
 			
 			this.#pool.push(worker);
 		});
